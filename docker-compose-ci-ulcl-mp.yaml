@@ -25,6 +25,7 @@ services:
       privnet:
         aliases:
           - i-upf-1.free5gc.org
+        ipv4_address: 10.100.200.101
       mec-net:
         aliases:
           - i-upf-1.mec.org
@@ -42,6 +43,7 @@ services:
       privnet:
         aliases:
           - i-upf-2.free5gc.org
+        ipv4_address: 10.100.200.102
       mec-net:
         aliases:
           - i-upf-2.mec.org
@@ -337,57 +339,101 @@ services:
       - db
       - free5gc-nrf
 
-  ci-test-1: # packet rusher
-    container_name: ci-1
-    build:
-      context: ./ci
-      args:
-        DEBUG_TOOLS: "false"
-    command: tail -f /dev/null
+  gnb-1:
+    container_name: gnb-1
+    image: alonza0314/free-ran-ue:latest
+    command: ./free-ran-ue gnb -c ./gnbcfg.yaml
     volumes:
-      - ./config/MP/ci-1.yaml:/root/PacketRusher/config/config.yml
-      - ./test:/root/test
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - "/dev/net/tun"
+      - ./config/MP/gnbcfg-1.yaml:/free-ran-ue/gnbcfg.yaml
     networks:
       privnet:
-        aliases:
-          - ci-1.free5gc.org
         ipv4_address: 10.100.200.100
+      ran-ue-1:
+        ipv4_address: 10.0.3.3
     depends_on:
       - free5gc-amf
+      - free5gc-ausf
+      - free5gc-chf
+      - free5gc-nrf
+      - free5gc-nssf
+      - free5gc-pcf
+      - free5gc-smf
+      - free5gc-udm
+      - free5gc-udr
       - free5gc-i-upf-1
       - free5gc-i-upf-2
       - free5gc-psa-upf-1
       - free5gc-psa-upf-2
 
-  ci-test-2: # packet rusher
-    container_name: ci-2
+  ue-1:
+    container_name: ue-1
     build:
       context: ./ci
       args:
         DEBUG_TOOLS: "false"
-    command: tail -f /dev/null
+    command: ["tail", "-f", "/dev/null"]
     volumes:
-      - ./config/MP/ci-2.yaml:/root/PacketRusher/config/config.yml
+      - ./config/MP/uecfg-1.yaml:/free-ran-ue/uecfg.yaml
       - ./test:/root/test
     cap_add:
       - NET_ADMIN
     devices:
-      - "/dev/net/tun"
+      - /dev/net/tun:/dev/net/tun
     networks:
       privnet:
-        aliases:
-          - ci-2.free5gc.org
+        ipv4_address: 10.100.200.51
+      ran-ue-1:
+        ipv4_address: 10.0.3.2
+    depends_on:
+      - gnb-1
+
+  gnb-2:
+    container_name: gnb-2
+    image: alonza0314/free-ran-ue:latest
+    command: ./free-ran-ue gnb -c ./gnbcfg.yaml
+    volumes:
+      - ./config/MP/gnbcfg-2.yaml:/free-ran-ue/gnbcfg.yaml
+    networks:
+      privnet:
         ipv4_address: 10.100.200.200
+      ran-ue-2:
+        ipv4_address: 10.0.4.3
     depends_on:
       - free5gc-amf
+      - free5gc-ausf
+      - free5gc-chf
+      - free5gc-nrf
+      - free5gc-nssf
+      - free5gc-pcf
+      - free5gc-smf
+      - free5gc-udm
+      - free5gc-udr
       - free5gc-i-upf-1
       - free5gc-i-upf-2
       - free5gc-psa-upf-1
       - free5gc-psa-upf-2
+
+  ue-2:
+    container_name: ue-2
+    build:
+      context: ./ci
+      args:
+        DEBUG_TOOLS: "false"
+    command: ["tail", "-f", "/dev/null"]
+    volumes:
+      - ./config/MP/uecfg-2.yaml:/free-ran-ue/uecfg.yaml
+      - ./test:/root/test
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      privnet:
+        ipv4_address: 10.100.200.52
+      ran-ue-2:
+        ipv4_address: 10.0.4.2
+    depends_on:
+      - gnb-2
 
 networks:
   privnet:
@@ -413,6 +459,22 @@ networks:
         - subnet: 10.100.50.0/24
     driver_opts:
       com.docker.network.bridge.name: br-n6
+
+  ran-ue-1:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.3.0/24
+    driver_opts:
+      com.docker.network.bridge.name: br-ran-ue-1
+
+  ran-ue-2:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.4.0/24
+    driver_opts:
+      com.docker.network.bridge.name: br-ran-ue-2
 
 volumes:
   dbdata:

@@ -1,7 +1,7 @@
 package test
 
 import (
-	packetRusher "test/packetRusher"
+	freeRanUE "test/freeRanUE"
 	pinger "test/pinger"
 	"testing"
 	"time"
@@ -22,9 +22,9 @@ var testMpCases = []struct {
 }
 
 func TestULCLMultiPathCi1(t *testing.T) {
-	pr := packetRusher.NewPacketRusher()
-	pr.Activate()
-	defer pr.Deactivate()
+	fru := freeRanUE.NewFreeRanUe()
+	fru.Activate()
+	defer fru.Deactivate()
 
 	time.Sleep(5 * time.Second)
 
@@ -38,9 +38,9 @@ func TestULCLMultiPathCi1(t *testing.T) {
 }
 
 func TestULCLMultiPathCi2(t *testing.T) {
-	pr := packetRusher.NewPacketRusher()
-	pr.Activate()
-	defer pr.Deactivate()
+	fru := freeRanUE.NewFreeRanUe()
+	fru.Activate()
+	defer fru.Deactivate()
 
 	time.Sleep(5 * time.Second)
 

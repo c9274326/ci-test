@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
-	packetRusher "test/packetRusher"
+	freeRanUE "test/freeRanUE"
 	pinger "test/pinger"
 )
 
 func TestULCLTrafficInfluence(t *testing.T) {
-	// PacketRusher
-	pr := packetRusher.NewPacketRusher()
-	pr.Activate()
-	defer pr.Deactivate()
+	// FreeRanUe
+	fru := freeRanUE.NewFreeRanUe()
+	fru.Activate()
+	defer fru.Deactivate()
 
 	time.Sleep(3 * time.Second)
 
@@ -58,35 +58,36 @@ func pingN6gwSuccessMecFailed(t *testing.T) {
 	}
 	err = pinger.Pinger(MEC_IP, NIC_1)
 	if err == nil {
-		t.Errorf("Ping mec failed: expected ping failed, but got %v", err)
+		t.Errorf("Ping mec success: expected ping failed, but got success")
 	}
 }
 
 func pingN6gwFailedMecSuccess(t *testing.T) {
 	err := pinger.Pinger(N6GW_IP, NIC_1)
-	if err != nil {
-		t.Errorf("Ping n6gw failed: expected ping failed, but got %v", err)
+	if err == nil {
+		t.Errorf("Ping n6gw success: expected ping failed, but got success")
 	}
 	err = pinger.Pinger(MEC_IP, NIC_1)
-	if err == nil {
-		t.Errorf("Ping mec failed: expected ping sucess, but got %v", err)
+	if err != nil {
+		t.Errorf("Ping mec failed: expected ping success, but got %v", err)
 	}
 }
 
 func pingOneOneOneOne(t *testing.T) {
-	err := pinger.Pinger(ONE_IP, NIC_1)
+    err := pinger.Pinger(ONE_IP, NIC_1)
 	if err != nil {
 		t.Errorf("Ping one.one.one.one failed: expected ping success, but got %v", err)
 	}
 }
 
 func tiOperation(t *testing.T, operation string) {
-	cmd := exec.Command("bash", "../api-udr-ti-data-action.sh", operation)
+	cmd := exec.Command("bash", "api-udr-ti-data-action.sh", operation)
+	cmd.Dir = ".."
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Errorf("TI operation failed: expected %s success, but got %v, output: %s", operation, err, output)
 	}
-	time.Sleep(3 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 }
 
 func checkChargingRecord(t *testing.T) {

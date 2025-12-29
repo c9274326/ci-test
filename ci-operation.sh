@@ -21,7 +21,7 @@ usage() {
     echo "  - up <ulcl-ti | ulcl-mp>: bring up the compose"
     echo "  - down <ulcl-ti | ulcl-mp>: shut down the compose"
     echo "  - test <ulcl-ti | ulcl-mp>: run ULCL test"
-    echo "  - exec <ci | ci-1 | ci-2>: enter the ci container"
+    echo "  - exec <ue | ue-1 | ue-2>: enter the ue container"
 }
 
 main() {
@@ -72,11 +72,11 @@ main() {
         "test")
             case "$2" in
                 "ulcl-ti")
-                    docker exec ci /bin/bash -c "cd /root/test && ./test-ulcl-ti.sh TestULCLTrafficInfluence"
+                    docker exec ue /bin/bash -c "cd /root/test && ./test-ulcl-ti.sh TestULCLTrafficInfluence"
                 ;;
                 "ulcl-mp")
-                    docker exec ci-1 /bin/bash -c "cd /root/test && ./test-ulcl-mp.sh TestULCLMultiPathCi1"
-                    docker exec ci-2 /bin/bash -c "cd /root/test && ./test-ulcl-mp.sh TestULCLMultiPathCi2"
+                    docker exec ue-1 /bin/bash -c "cd /root/test && ./test-ulcl-mp.sh TestULCLMultiPathCi1"
+                    docker exec ue-2 /bin/bash -c "cd /root/test && ./test-ulcl-mp.sh TestULCLMultiPathCi2"
                 ;;
                 *)
                     usage
@@ -85,13 +85,13 @@ main() {
         "exec")
             case "$2" in
                 "ci")
-                    docker exec -it ci bash
+                    docker exec -it ue bash
                 ;;
                 "ci-1")
-                    docker exec -it ci-1 bash
+                    docker exec -it ue-1 bash
                 ;;
                 "ci-2")
-                    docker exec -it ci-2 bash
+                    docker exec -it ue-2 bash
                 ;;
                 *)
                     usage

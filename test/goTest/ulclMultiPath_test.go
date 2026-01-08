@@ -21,7 +21,7 @@ var testMpCases = []struct {
 	},
 }
 
-func TestULCLMultiPathCi1(t *testing.T) {
+func TestULCLMultiPathUe1(t *testing.T) {
 	fru := freeRanUE.NewFreeRanUe()
 	fru.Activate()
 	defer fru.Deactivate()
@@ -37,7 +37,7 @@ func TestULCLMultiPathCi1(t *testing.T) {
 	}
 }
 
-func TestULCLMultiPathCi2(t *testing.T) {
+func TestULCLMultiPathUe2(t *testing.T) {
 	fru := freeRanUE.NewFreeRanUe()
 	fru.Activate()
 	defer fru.Deactivate()

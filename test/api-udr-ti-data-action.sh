@@ -10,6 +10,8 @@
 ##########################
 
 set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TI_DATA_JSON="$SCRIPT_DIR/json/ti-data.json"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TI_DATA_JSON="$SCRIPT_DIR/json/ti-data.json"
@@ -22,7 +24,7 @@ case "$1" in
         ;;
     "get")
         curl -X GET -H "Content-Type: application/json" \
-            http://udr.free5gc.org:8000/nudr-dr/v2/application-data/influenceData/
+            http://udr.free5gc.org:8000/nudr-dr/v2/application-data/influenceData
         ;;
     "delete")
         curl -X DELETE -H "Content-Type: application/json" \

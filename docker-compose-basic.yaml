@@ -28,29 +28,7 @@ services:
       privnet:
         aliases:
           - upf.free5gc.org
-      n6-net:
-        aliases:
-          - upf.n6.org
-
-  free5gc-n6gw: # n6gw
-    container_name: n6gw
-    build:
-      context: ./dn_n6gw
-      args:
-        DEBUG_TOOLS: "false"
-    command: bash -c "./n6gw-iptables.sh && sleep infinity"
-    volumes: 
-      - ./config/iptables/n6gw-iptables.sh:/root/n6gw-iptables.sh
-    cap_add:
-      - NET_ADMIN
-    networks:
-      privnet:
-        aliases:
-          - n6gw.free5gc.org
-      n6-net:
-        aliases:
-          - n6gw.local
-        ipv4_address: 10.100.50.10
+        ipv4_address: 10.100.200.8
 
   free5gc-nrf: # nrf
     container_name: nrf
@@ -299,28 +277,50 @@ services:
       - db
       - free5gc-nrf
 
-  ci-test: # packet rusher
-    container_name: ci
+  gnb:
+    container_name: gnb
+    image: alonza0314/free-ran-ue:latest
+    command: ./free-ran-ue gnb -c ./gnbcfg.yaml
+    volumes:
+      - ./config/TI/gnbcfg.yaml:/free-ran-ue/gnbcfg.yaml
+    networks:
+      privnet:
+        ipv4_address: 10.100.200.50
+      ran-ue:
+        ipv4_address: 10.0.2.3
+    depends_on:
+      - free5gc-amf
+      - free5gc-ausf
+      - free5gc-chf
+      - free5gc-nrf
+      - free5gc-nssf
+      - free5gc-pcf
+      - free5gc-smf
+      - free5gc-udm
+      - free5gc-udr
+      - free5gc-upf
+
+  ue:
+    container_name: ue
     build:
       context: ./ci
       args:
         DEBUG_TOOLS: "false"
-    command: tail -f /dev/null
+    command: ["tail", "-f", "/dev/null"]
     volumes:
-      - ./config/ci.yaml:/root/PacketRusher/config/config.yml
+      - ./config/TI/uecfg.yaml:/free-ran-ue/uecfg.yaml
       - ./test:/root/test
     cap_add:
       - NET_ADMIN
     devices:
-      - "/dev/net/tun"
+      - /dev/net/tun:/dev/net/tun
     networks:
       privnet:
-        aliases:
-          - ci.free5gc.org
-        ipv4_address: 10.100.200.100
+        ipv4_address: 10.100.200.51
+      ran-ue:
+        ipv4_address: 10.0.2.2
     depends_on:
-      - free5gc-amf
-      - free5gc-upf
+      - gnb
 
 networks:
   privnet:
@@ -331,13 +331,13 @@ networks:
     driver_opts:
       com.docker.network.bridge.name: br-free5gc
 
-  n6-net:
+  ran-ue:
     ipam:
       driver: default
       config:
-        - subnet: 10.100.50.0/24
+        - subnet: 10.0.2.0/24
     driver_opts:
-      com.docker.network.bridge.name: br-n6
+      com.docker.network.bridge.name: br-ran-ue
 
 volumes:
   dbdata:

@@ -1,7 +1,7 @@
 package test
 
 import (
-	packetRusher "test/packetRusher"
+	freeRanUE "test/freeRanUE"
 	pinger "test/pinger"
 	"testing"
 	"time"
@@ -22,9 +22,9 @@ var testBasicChargingCases = []struct {
 }
 
 func TestBasicCharging(t *testing.T) {
-	pr := packetRusher.NewPacketRusher()
-	pr.Activate()
-	defer pr.Deactivate()
+	fru := freeRanUE.NewFreeRanUe()
+	fru.Activate()
+	defer fru.Deactivate()
 
 	time.Sleep(5 * time.Second)
 

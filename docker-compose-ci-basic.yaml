@@ -25,6 +25,7 @@ services:
       privnet:
         aliases:
           - upf.free5gc.org
+        ipv4_address: 10.100.200.8
 
   free5gc-nrf: # nrf
     container_name: nrf

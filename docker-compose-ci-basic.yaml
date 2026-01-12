@@ -246,7 +246,7 @@ services:
     image: alonza0314/free-ran-ue:latest
     command: ./free-ran-ue gnb -c ./gnbcfg.yaml
     volumes:
-      - ./config/gnbcfg.yaml:/free-ran-ue/gnbcfg.yaml
+      - ./config/gnbCfg.yaml:/free-ran-ue/gnbcfg.yaml
     networks:
       privnet:
         ipv4_address: 10.100.200.50
@@ -272,7 +272,7 @@ services:
         DEBUG_TOOLS: "false"
     command: ["tail", "-f", "/dev/null"]
     volumes:
-      - ./config/uecfg.yaml:/free-ran-ue/uecfg.yaml
+      - ./config/ueCfg.yaml:/free-ran-ue/uecfg.yaml
       - ./test:/root/test
     cap_add:
       - NET_ADMIN

@@ -389,7 +389,7 @@ services:
     image: alonza0314/free-ran-ue:latest
     command: ./free-ran-ue gnb -c ./gnbcfg.yaml
     volumes:
-      - ./config/MP/gnbcfg-1.yaml:/free-ran-ue/gnbcfg.yaml
+      - ./config/MP/gnbCfg-1.yaml:/free-ran-ue/gnbcfg.yaml
     networks:
       privnet:
         ipv4_address: 10.100.200.100
@@ -418,7 +418,7 @@ services:
         DEBUG_TOOLS: "false"
     command: ["tail", "-f", "/dev/null"]
     volumes:
-      - ./config/MP/uecfg-1.yaml:/free-ran-ue/uecfg.yaml
+      - ./config/MP/ueCfg-1.yaml:/free-ran-ue/uecfg.yaml
       - ./test:/root/test
     cap_add:
       - NET_ADMIN
@@ -437,7 +437,7 @@ services:
     image: alonza0314/free-ran-ue:latest
     command: ./free-ran-ue gnb -c ./gnbcfg.yaml
     volumes:
-      - ./config/MP/gnbcfg-2.yaml:/free-ran-ue/gnbcfg.yaml
+      - ./config/MP/gnbCfg-2.yaml:/free-ran-ue/gnbcfg.yaml
     networks:
       privnet:
         ipv4_address: 10.100.200.200
@@ -466,7 +466,7 @@ services:
         DEBUG_TOOLS: "false"
     command: ["tail", "-f", "/dev/null"]
     volumes:
-      - ./config/MP/uecfg-2.yaml:/free-ran-ue/uecfg.yaml
+      - ./config/MP/ueCfg-2.yaml:/free-ran-ue/uecfg.yaml
       - ./test:/root/test
     cap_add:
       - NET_ADMIN

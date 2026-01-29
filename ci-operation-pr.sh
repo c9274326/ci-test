@@ -8,6 +8,7 @@
 # Usage:
 #   ./ci-test-pr.sh nf <NF1> <PR1> [<PR2> ...] [<NF2> <PR3> ...] [OPTIONS]
 #   ./ci-test-pr.sh lib <LIBRARY> <PR#> [OPTIONS]
+#   ./ci-test-pr.sh free5gc <PR#> nf <NF1> <PR1> [<NF2> <PR2> ...] [OPTIONS]
 #
 # OPTIONS:
 #   --skip-docker    Skip Docker Compose tests
@@ -15,11 +16,12 @@
 #   --skip-pull      Skip pulling (if already pulled)
 #
 # Examples:
-#   ./ci-test-pr.sh nf amf 193
-#   ./ci-test-pr.sh nf smf 170 183 192
-#   ./ci-test-pr.sh nf smf 170 183 192 udm 80 81 amf 50
-#   ./ci-test-pr.sh nf smf 188 udm 77 --skip-docker
-#   ./ci-test-pr.sh lib openapi 67
+#   ./ci-operation-pr.sh nf amf 193
+#   ./ci-operation-pr.sh nf smf 170 183 192
+#   ./ci-operation-pr.sh nf smf 170 183 192 udm 80 81 amf 50
+#   ./ci-operation-pr.sh nf smf 188 udm 77 --skip-docker
+#   ./ci-operation-pr.sh lib openapi 67
+#   ./ci-operation-pr.sh free5gc 787 nf amf 194   # Test main repo PR with NF PR
 #
 
 set -e
@@ -65,6 +67,7 @@ usage() {
     echo "Usage:"
     echo "  $0 nf <NF1> <PR1> [<PR2> ...] [<NF2> <PR3> ...] [OPTIONS]"
     echo "  $0 lib <LIBRARY> <PR#> [OPTIONS]"
+    echo "  $0 free5gc <PR#> nf <NF1> <PR1> [<NF2> <PR2> ...] [OPTIONS]"
     echo ""
     echo "OPTIONS:"
     echo "  --skip-docker    Skip Docker Compose tests"
@@ -76,6 +79,7 @@ usage() {
     echo "  $0 nf smf 170 183 192              # Multiple PRs for same NF"
     echo "  $0 nf smf 170 183 udm 80 81 amf 50 # Multiple NFs with multiple PRs"
     echo "  $0 lib openapi 67"
+    echo "  $0 free5gc 787 nf amf 194          # Test main repo PR #787 with AMF PR #194"
     echo ""
     echo "Supported NFs: $SUPPORTED_NFS"
     echo "Supported Libraries: $SUPPORTED_LIBS"
@@ -140,7 +144,65 @@ done
 # Associative array to store NF -> PR list mapping
 declare -A NF_PRS
 
+# Variable to store main free5gc repo PR
+FREE5GC_PR=""
+
 case $TYPE in
+    free5gc)
+        # Format: free5gc <PR#> nf <NF1> <PR1> [<NF2> <PR2> ...]
+        if [ ${#REMAINING_ARGS[@]} -lt 4 ]; then
+            echo "Error: free5gc PR number and at least one NF with PR required"
+            echo "Format: $0 free5gc <PR#> nf <NF1> <PR1> ..."
+            usage
+        fi
+        
+        # First argument should be the free5gc main repo PR number
+        if ! is_number "${REMAINING_ARGS[0]}"; then
+            echo "Error: Expected PR number after 'free5gc', got '${REMAINING_ARGS[0]}'"
+            usage
+        fi
+        FREE5GC_PR="${REMAINING_ARGS[0]}"
+        
+        # Second argument should be 'nf'
+        if [ "${REMAINING_ARGS[1]}" != "nf" ]; then
+            echo "Error: Expected 'nf' after free5gc PR number, got '${REMAINING_ARGS[1]}'"
+            usage
+        fi
+        
+        # Parse remaining NF/PR pairs (starting from index 2)
+        CURRENT_NF=""
+        for ((i=2; i<${#REMAINING_ARGS[@]}; i++)); do
+            arg="${REMAINING_ARGS[$i]}"
+            if is_nf "$arg"; then
+                CURRENT_NF="$arg"
+                if [ -z "${NF_PRS[$CURRENT_NF]}" ]; then
+                    NF_PRS[$CURRENT_NF]=""
+                fi
+            elif is_number "$arg"; then
+                if [ -z "$CURRENT_NF" ]; then
+                    echo "Error: PR number '$arg' without NF name"
+                    usage
+                fi
+                if [ -z "${NF_PRS[$CURRENT_NF]}" ]; then
+                    NF_PRS[$CURRENT_NF]="$arg"
+                else
+                    NF_PRS[$CURRENT_NF]="${NF_PRS[$CURRENT_NF]} $arg"
+                fi
+            else
+                echo "Error: Unknown argument '$arg' (not a valid NF or PR number)"
+                usage
+            fi
+        done
+        
+        # Validate that we have at least one NF with PRs
+        if [ ${#NF_PRS[@]} -eq 0 ]; then
+            echo "Error: No valid NF/PR pairs found"
+            usage
+        fi
+        
+        # Set TYPE to nf for later processing, but remember we have FREE5GC_PR
+        TYPE="nf"
+        ;;
     nf)
         # Parse NF and PR pairs from remaining args
         # Format: <NF1> <PR1> [<PR2> ...] [<NF2> <PR3> ...]
@@ -206,6 +268,9 @@ echo -e "${NC}"
 echo "Type: $TYPE"
 
 if [ "$TYPE" = "nf" ]; then
+    if [ -n "$FREE5GC_PR" ]; then
+        echo "Main free5gc Repo PR: #$FREE5GC_PR"
+    fi
     echo "NF/PR Configuration:"
     for nf in "${!NF_PRS[@]}"; do
         echo "  - $nf: PRs ${NF_PRS[$nf]}"
@@ -233,6 +298,9 @@ fi
 # Build PR string for report filename
 if [ "$TYPE" = "nf" ]; then
     PR_STR=""
+    if [ -n "$FREE5GC_PR" ]; then
+        PR_STR="free5gc_${FREE5GC_PR}_"
+    fi
     for nf in "${!NF_PRS[@]}"; do
         prs="${NF_PRS[$nf]}"
         pr_joined="${prs// /_}"
@@ -253,6 +321,9 @@ REPORT_FILE="$REPORT_DIR/pr_test_${PR_STR}_$(date +%Y%m%d_%H%M%S).txt"
     echo "Date: $(date)"
     echo "Type: $TYPE"
     if [ "$TYPE" = "nf" ]; then
+        if [ -n "$FREE5GC_PR" ]; then
+            echo "Main free5gc Repo PR: #$FREE5GC_PR"
+        fi
         echo "NF/PR Configuration:"
         for nf in "${!NF_PRS[@]}"; do
             echo "  - $nf: PRs ${NF_PRS[$nf]}"
@@ -289,8 +360,55 @@ fi
 log_step 2 "Fetching and Merging PR(s)"
 
 if [ "$TYPE" = "nf" ]; then
-    echo "[STEP 2] Fetch/Merge NF PRs:" >> "$REPORT_FILE"
+    echo "[STEP 2] Fetch/Merge PRs:" >> "$REPORT_FILE"
     
+    # First, merge main free5gc repo PR if specified
+    if [ -n "$FREE5GC_PR" ]; then
+        log_info "Processing main free5gc repo PR #$FREE5GC_PR..."
+        
+        cd base/free5gc
+        
+        # Create a test branch from current HEAD
+        git checkout -b test-free5gc-pr-$(date +%s) 2>/dev/null || git checkout -B test-free5gc-pr-$(date +%s)
+        
+        log_info "Fetching and merging free5gc PR #$FREE5GC_PR..."
+        
+        # Fetch the PR from main free5gc repo
+        git fetch origin pull/$FREE5GC_PR/head:pr-$FREE5GC_PR
+        
+        # Try to merge
+        if git merge pr-$FREE5GC_PR --no-edit -m "Merge free5gc PR #$FREE5GC_PR for testing"; then
+            log_pass "Merged free5gc PR #$FREE5GC_PR successfully"
+            echo "  - free5gc #$FREE5GC_PR: MERGED" >> "../../$REPORT_FILE"
+        else
+            log_fail "Merge conflict for free5gc PR #$FREE5GC_PR"
+            echo "  - free5gc #$FREE5GC_PR: CONFLICT" >> "../../$REPORT_FILE"
+            echo ""
+            echo -e "${RED}========================================${NC}"
+            echo -e "${RED}MERGE CONFLICT DETECTED${NC}"
+            echo -e "${RED}========================================${NC}"
+            echo ""
+            echo "Repo: free5gc (main), PR: #$FREE5GC_PR"
+            echo "Directory: $(pwd)"
+            echo ""
+            echo "Please resolve the conflict manually:"
+            echo "  1. cd $(pwd)"
+            echo "  2. Resolve conflicts in the files listed above"
+            echo "  3. git add <resolved files>"
+            echo "  4. git commit"
+            echo "  5. Re-run this script with --skip-pull"
+            echo ""
+            exit 1
+        fi
+        
+        # Run go mod tidy after merging main repo PR
+        log_info "Running go mod tidy for main free5gc repo..."
+        go mod tidy || log_warn "go mod tidy failed for main free5gc repo"
+        
+        cd ../../
+    fi
+    
+    # Then process NF PRs
     for nf in "${!NF_PRS[@]}"; do
         prs="${NF_PRS[$nf]}"
         log_info "Processing NF: $nf with PRs: $prs"
@@ -349,6 +467,33 @@ if [ "$TYPE" = "nf" ]; then
     cd ../../../
 else
     log_info "Updating library $LIBRARY for all NFs..."
+    
+    # First, clone the library repo and get the PR commit hash
+    LIB_TEMP_DIR="temp-lib-$LIBRARY-$$"
+    log_info "Cloning $LIBRARY repo to get PR commit hash..."
+    
+    cd base
+    if [ -d "$LIB_TEMP_DIR" ]; then
+        rm -rf "$LIB_TEMP_DIR"
+    fi
+    
+    git clone --depth 1 "https://github.com/free5gc/$LIBRARY.git" "$LIB_TEMP_DIR" 2>/dev/null
+    cd "$LIB_TEMP_DIR"
+    
+    # Fetch the PR
+    log_info "Fetching PR #$LIB_PR..."
+    git fetch origin "pull/$LIB_PR/head:pr-$LIB_PR" --depth 50
+    git checkout "pr-$LIB_PR"
+    
+    # Get the commit hash
+    LIB_COMMIT=$(git rev-parse HEAD)
+    log_info "PR #$LIB_PR commit hash: $LIB_COMMIT"
+    
+    cd ..
+    rm -rf "$LIB_TEMP_DIR"
+    cd ..
+    
+    # Now update all NFs with the commit hash
     cd base/free5gc
     
     UPDATED_NFS=""
@@ -357,11 +502,12 @@ else
         if grep -q "github.com/free5gc/$LIBRARY" "$nf_dir/go.mod" 2>/dev/null; then
             log_info "Updating $nf_name..."
             cd "$nf_dir"
-            if go get github.com/free5gc/$LIBRARY@pr-$LIB_PR; then
+            if go get "github.com/free5gc/$LIBRARY@$LIB_COMMIT"; then
                 go mod tidy
                 UPDATED_NFS="$UPDATED_NFS $nf_name"
+                log_pass "Updated $nf_name"
             else
-                log_warn "Failed to get $LIBRARY@pr-$LIB_PR for $nf_name"
+                log_warn "Failed to get $LIBRARY@$LIB_COMMIT for $nf_name"
             fi
             cd ../../
         fi
@@ -371,14 +517,19 @@ else
     if grep -q "github.com/free5gc/$LIBRARY" "test/go.mod" 2>/dev/null; then
         log_info "Updating test module..."
         cd test
-        go get github.com/free5gc/$LIBRARY@pr-$LIB_PR || log_warn "Failed to update test module"
-        go mod tidy
+        if go get "github.com/free5gc/$LIBRARY@$LIB_COMMIT"; then
+            go mod tidy
+            log_pass "Updated test module"
+        else
+            log_warn "Failed to update test module"
+        fi
         cd ..
     fi
     
     cd ../../
-    echo "[STEP 2] Update Library $LIBRARY PR #$LIB_PR: SUCCESS" >> "$REPORT_FILE"
+    echo "[STEP 2] Update Library $LIBRARY PR #$LIB_PR (commit: ${LIB_COMMIT:0:8}): SUCCESS" >> "$REPORT_FILE"
     echo "  Updated NFs:$UPDATED_NFS" >> "$REPORT_FILE"
+
 fi
 
 # ============================================================
@@ -589,6 +740,9 @@ echo -e "${NC}"
 echo "Type: $TYPE"
 
 if [ "$TYPE" = "nf" ]; then
+    if [ -n "$FREE5GC_PR" ]; then
+        echo "Main free5gc Repo PR: #$FREE5GC_PR"
+    fi
     echo "NF/PR Configuration:"
     for nf in "${!NF_PRS[@]}"; do
         echo "  - $nf: PRs ${NF_PRS[$nf]}"

@@ -57,7 +57,7 @@ TEST_TIMEOUT=300
 DOCKER_TIMEOUT=300
 
 # Supported libraries and NFs
-SUPPORTED_LIBS="openapi util"
+SUPPORTED_LIBS="openapi util nas ngap pfcp aper"
 SUPPORTED_NFS="amf ausf bsf chf n3iwf nef nrf nssf pcf smf tngf udm udr upf webconsole"
 
 # Report directory
@@ -466,58 +466,65 @@ if [ "$TYPE" = "nf" ]; then
     go mod tidy || log_warn "go mod tidy failed for test module"
     cd ../../../
 else
-    log_info "Updating library $LIBRARY for all NFs..."
+    log_info "Updating library $LIBRARY for all NFs using go mod edit -replace..."
     
-    # First, clone the library repo and get the PR commit hash
-    LIB_TEMP_DIR="temp-lib-$LIBRARY-$$"
-    log_info "Cloning $LIBRARY repo to get PR commit hash..."
+    # Get PR information from GitHub API
+    log_info "Fetching PR #$LIB_PR info from GitHub API..."
     
-    cd base
-    if [ -d "$LIB_TEMP_DIR" ]; then
-        rm -rf "$LIB_TEMP_DIR"
+    PR_API_URL="https://api.github.com/repos/free5gc/$LIBRARY/pulls/$LIB_PR"
+    PR_INFO=$(curl -s "$PR_API_URL")
+    
+    # Extract PR author (head.user.login) and commit hash (head.sha)
+    PR_AUTHOR=$(echo "$PR_INFO" | grep -o '"login": "[^"]*"' | head -1 | cut -d'"' -f4)
+    PR_COMMIT=$(echo "$PR_INFO" | grep -o '"sha": "[^"]*"' | head -1 | cut -d'"' -f4)
+    PR_STATE=$(echo "$PR_INFO" | grep -o '"state": "[^"]*"' | head -1 | cut -d'"' -f4)
+    
+    # Validate we got the info
+    if [ -z "$PR_AUTHOR" ] || [ -z "$PR_COMMIT" ]; then
+        log_fail "Failed to get PR info from GitHub API"
+        echo "API Response: $PR_INFO"
+        exit 1
     fi
     
-    git clone --depth 1 "https://github.com/free5gc/$LIBRARY.git" "$LIB_TEMP_DIR" 2>/dev/null
-    cd "$LIB_TEMP_DIR"
+    log_info "PR #$LIB_PR Details:"
+    log_info "  Author: $PR_AUTHOR"
+    log_info "  Commit: $PR_COMMIT"
+    log_info "  State: $PR_STATE"
     
-    # Fetch the PR
-    log_info "Fetching PR #$LIB_PR..."
-    git fetch origin "pull/$LIB_PR/head:pr-$LIB_PR" --depth 50
-    git checkout "pr-$LIB_PR"
+    # Build the replace directive
+    ORIGINAL_MODULE="github.com/free5gc/$LIBRARY"
+    REPLACE_MODULE="github.com/$PR_AUTHOR/$LIBRARY@$PR_COMMIT"
     
-    # Get the commit hash
-    LIB_COMMIT=$(git rev-parse HEAD)
-    log_info "PR #$LIB_PR commit hash: $LIB_COMMIT"
+    log_info "Replace directive: $ORIGINAL_MODULE => $REPLACE_MODULE"
     
-    cd ..
-    rm -rf "$LIB_TEMP_DIR"
-    cd ..
-    
-    # Now update all NFs with the commit hash
+    # Update all NFs
     cd base/free5gc
     
     UPDATED_NFS=""
-    for nf_dir in NFs/*/; do
-        nf_name=$(basename "$nf_dir")
-        if grep -q "github.com/free5gc/$LIBRARY" "$nf_dir/go.mod" 2>/dev/null; then
-            log_info "Updating $nf_name..."
+    for nf in amf ausf bsf chf n3iwf nef nrf nssf pcf smf tngf udm udr upf; do
+        nf_dir="NFs/$nf"
+        if [ -d "$nf_dir" ] && grep -q "$ORIGINAL_MODULE" "$nf_dir/go.mod" 2>/dev/null; then
+            log_info "Updating $nf..."
             cd "$nf_dir"
-            if go get "github.com/free5gc/$LIBRARY@$LIB_COMMIT"; then
+            
+            # Use go mod edit -replace
+            if go mod edit -replace "$ORIGINAL_MODULE=$REPLACE_MODULE"; then
                 go mod tidy
-                UPDATED_NFS="$UPDATED_NFS $nf_name"
-                log_pass "Updated $nf_name"
+                UPDATED_NFS="$UPDATED_NFS $nf"
+                log_pass "Updated $nf"
             else
-                log_warn "Failed to get $LIBRARY@$LIB_COMMIT for $nf_name"
+                log_warn "Failed to update $nf"
             fi
+            
             cd ../../
         fi
     done
     
     # Also update test module
-    if grep -q "github.com/free5gc/$LIBRARY" "test/go.mod" 2>/dev/null; then
+    if grep -q "$ORIGINAL_MODULE" "test/go.mod" 2>/dev/null; then
         log_info "Updating test module..."
         cd test
-        if go get "github.com/free5gc/$LIBRARY@$LIB_COMMIT"; then
+        if go mod edit -replace "$ORIGINAL_MODULE=$REPLACE_MODULE"; then
             go mod tidy
             log_pass "Updated test module"
         else
@@ -526,8 +533,22 @@ else
         cd ..
     fi
     
+    # Also update main free5gc go.mod if it uses the library
+    if grep -q "$ORIGINAL_MODULE" "go.mod" 2>/dev/null; then
+        log_info "Updating main free5gc go.mod..."
+        if go mod edit -replace "$ORIGINAL_MODULE=$REPLACE_MODULE"; then
+            go mod tidy
+            log_pass "Updated main free5gc module"
+        else
+            log_warn "Failed to update main free5gc module"
+        fi
+    fi
+    
     cd ../../
-    echo "[STEP 2] Update Library $LIBRARY PR #$LIB_PR (commit: ${LIB_COMMIT:0:8}): SUCCESS" >> "$REPORT_FILE"
+    echo "[STEP 2] Update Library $LIBRARY PR #$LIB_PR:" >> "$REPORT_FILE"
+    echo "  Author: $PR_AUTHOR" >> "$REPORT_FILE"
+    echo "  Commit: ${PR_COMMIT:0:12}" >> "$REPORT_FILE"
+    echo "  Replace: $ORIGINAL_MODULE => $REPLACE_MODULE" >> "$REPORT_FILE"
     echo "  Updated NFs:$UPDATED_NFS" >> "$REPORT_FILE"
 
 fi
